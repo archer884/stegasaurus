@@ -68,19 +68,12 @@ impl Message<'_> {
 pub fn recover(carrier: impl BufRead + Seek, mut write: impl Write) -> Result<()> {
     let carrier_image = image::load(carrier, PNG)?;
     let carrier_stream = carrier_image.raw_pixels();
-
-    let len = dbg!(read_len(&carrier_stream[0..32]));
-    if len != 13 {
-        panic!("Doh!");
-    }
-    
+    let len = read_len(&carrier_stream[0..32]);
     let bytes: Vec<_> = read_bytes(&carrier_stream[32..], len).collect();
-
     Ok(write.write_all(&bytes)?)
 }
 
 fn read_len(s: &[u8]) -> u64 {
-    println!("{:?}", s);
     let mut len = 0u64;
     for &byte in s.iter().rev() {
         len <<= 2;
