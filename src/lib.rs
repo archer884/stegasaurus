@@ -88,7 +88,7 @@ pub fn recover(carrier: impl BufRead + Seek, mut write: impl Write) -> Result<()
     if expected_hash != recovered_hash {
         return Err(Error::Checksum);
     }
-    
+
     Ok(write.write_all(&bytes)?)
 }
 
