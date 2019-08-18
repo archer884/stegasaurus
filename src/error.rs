@@ -4,6 +4,7 @@ use std::io;
 
 #[derive(Debug)]
 pub enum Error {
+    Checksum,
     Image(image::ImageError),
     IO(io::Error),
 }
@@ -23,6 +24,7 @@ impl From<io::Error> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Error::Checksum => f.write_str("Recovered data failed checksum"),
             Error::Image(e) => write!(f, "{}", e),
             Error::IO(e) => write!(f, "{}", e),
         }
@@ -34,6 +36,7 @@ impl error::Error for Error {
         match self {
             Error::Image(e) => Some(e),
             Error::IO(e) => Some(e),
+            _ => None,
         }
     }
 }

@@ -1,6 +1,7 @@
 mod error;
 mod masks;
 
+use error::Error;
 use image::{png::PNGEncoder, GenericImageView, PNG};
 use masks::Masks;
 use std::io::{BufRead, Seek, Write};
@@ -37,12 +38,23 @@ impl Message<'_> {
         let mut carrier_stream = carrier_image.raw_pixels();
 
         self.write_len(&mut carrier_stream[0..32]);
-        self.write_message(&mut carrier_stream[32..]);
+        self.write_hash(&mut carrier_stream[32..160]);
+        self.write_message(&mut carrier_stream[160..]);
         Ok(destination_image.encode(&carrier_stream, width, height, color_type)?)
     }
 
     fn write_len(&self, s: &mut [u8]) {
         let masks = Length::from(self.content.len()).masks();
+        for (u, mask) in s.iter_mut().zip(masks) {
+            *u >>= 2;
+            *u <<= 2;
+            *u |= mask;
+        }
+    }
+
+    fn write_hash(&self, s: &mut [u8]) {
+        let hash = hash(&self.content);
+        let masks = hash.iter().map(|&u| Byte(u).masks()).flatten();
         for (u, mask) in s.iter_mut().zip(masks) {
             *u >>= 2;
             *u <<= 2;
@@ -68,8 +80,15 @@ impl Message<'_> {
 pub fn recover(carrier: impl BufRead + Seek, mut write: impl Write) -> Result<()> {
     let carrier_image = image::load(carrier, PNG)?;
     let carrier_stream = carrier_image.raw_pixels();
-    let len = read_len(&carrier_stream[0..32]);
-    let bytes: Vec<_> = read_bytes(&carrier_stream[32..], len).collect();
+    let len = read_len(&carrier_stream[0..32]) as usize;
+    let expected_hash: Vec<_> = read_bytes(&carrier_stream[32..160]).collect();
+    let bytes: Vec<_> = read_bytes(&carrier_stream[160..(160 + len * 4)]).collect();
+
+    let recovered_hash = hash(&bytes);
+    if expected_hash != recovered_hash {
+        return Err(Error::Checksum);
+    }
+    
     Ok(write.write_all(&bytes)?)
 }
 
@@ -82,8 +101,8 @@ fn read_len(s: &[u8]) -> u64 {
     len
 }
 
-fn read_bytes<'a>(s: &'a [u8], len: u64) -> impl Iterator<Item = u8> + 'a {
-    s.chunks_exact(4).take(len as usize).map(|chunk| {
+fn read_bytes<'a>(s: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
+    s.chunks_exact(4).map(|chunk| {
         let mut u = 0;
         u = apply_to_u8(u, chunk[3]);
         u <<= 2;
@@ -102,4 +121,11 @@ fn apply_to_u64(target: u64, bits: u8) -> u64 {
 
 fn apply_to_u8(target: u8, bits: u8) -> u8 {
     target | (bits & 0b0000_0011)
+}
+
+fn hash(s: &[u8]) -> [u8; 32] {
+    use sha3::{Digest, Sha3_256};
+    let mut hasher = Sha3_256::new();
+    hasher.input(s);
+    hasher.result().into()
 }
