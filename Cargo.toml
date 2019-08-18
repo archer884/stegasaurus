@@ -3,6 +3,15 @@ name = "stegosaurus"
 version = "0.1.0"
 authors = ["J/A <archer884@gmail.com>"]
 edition = "2018"
+license = "MIT/Apache-2.0"
+keywords = ["image", "image-manipulation", "cryptography"]
+repository = "https://github.com/archer884/stegosaurus"
+homepage = "https://github.com/archer884/stegosaurus"
+categories = ["cryptography"]
+description = """
+A steganography library able to conceal arbitrary data within PNG files. (Able
+to, but not necessarily good at.)
+"""
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
