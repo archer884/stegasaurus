@@ -7,6 +7,7 @@ pub enum Error {
     Checksum,
     Image(image::ImageError),
     IO(io::Error),
+    Length,
 }
 
 impl From<image::ImageError> for Error {
@@ -27,6 +28,7 @@ impl Display for Error {
             Error::Checksum => f.write_str("Recovered data failed checksum"),
             Error::Image(e) => write!(f, "{}", e),
             Error::IO(e) => write!(f, "{}", e),
+            Error::Length => f.write_str("Image not large enough to store data"),
         }
     }
 }

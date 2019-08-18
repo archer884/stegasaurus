@@ -37,6 +37,10 @@ impl Message<'_> {
 
         let mut carrier_stream = carrier_image.raw_pixels();
 
+        if carrier_stream.len() < 160 + self.content.len() * 4 {
+            return Err(Error::Length);
+        }
+
         self.write_len(&mut carrier_stream[0..32]);
         self.write_hash(&mut carrier_stream[32..160]);
         self.write_message(&mut carrier_stream[160..]);

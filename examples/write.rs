@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
-use stegosaurus::{Message, Result};
+use stegasaurus::{Message, Result};
 
 fn main() -> Result<()> {
     let message = Message::new(b"Hello, world!");

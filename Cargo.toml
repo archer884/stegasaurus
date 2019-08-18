@@ -1,12 +1,12 @@
 [package]
-name = "stegosaurus"
+name = "stegasaurus"
 version = "0.1.0"
 authors = ["J/A <archer884@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
 keywords = ["image", "image-manipulation", "cryptography"]
-repository = "https://github.com/archer884/stegosaurus"
-homepage = "https://github.com/archer884/stegosaurus"
+repository = "https://github.com/archer884/stegasaurus"
+homepage = "https://github.com/archer884/stegasaurus"
 categories = ["cryptography"]
 description = """
 A steganography library able to conceal arbitrary data within PNG files. (Able
