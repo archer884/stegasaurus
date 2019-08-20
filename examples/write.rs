@@ -1,11 +1,9 @@
-use std::fs::File;
-use std::io::BufReader;
-use stegasaurus::{Message, Result};
+use std::fs::{self, File};
 
-fn main() -> Result<()> {
-    let message = Message::new(b"Hello, world!");
-    let carrier = BufReader::new(File::open("./resource/illuminati.png")?);
-    let target = File::create("./resource/illuminati-modified.png")?;
-
-    message.store(carrier, target)
+fn main() -> stegasaurus::Result<()> {
+    stegasaurus::store(
+        b"Hello, world!",
+        &fs::read("./resource/illuminati.png")?,
+        File::create("./resource/illuminati-modified.png")?,
+    )
 }

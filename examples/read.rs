@@ -1,15 +1,12 @@
-use std::fs::File;
-use std::io::BufReader;
-use stegasaurus::Result;
+use std::fs;
 
-fn main() -> Result<()> {
-    let carrier = BufReader::new(File::open("./resource/illuminati-modified.png")?);
+fn main() -> stegasaurus::Result<()> {
     let mut content = Vec::new();
+    stegasaurus::recover(
+        &fs::read("./resource/illuminati-modified.png")?,
+        &mut content,
+    )?;
 
-    stegasaurus::recover(carrier, &mut content)?;
-
-    let message: String = content.into_iter().map(|u| u as char).collect();
-
-    println!("{}", message);
+    println!("{}", String::from_utf8_lossy(&content));
     Ok(())
 }

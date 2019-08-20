@@ -2,98 +2,60 @@ mod error;
 mod masks;
 
 use error::Error;
-use image::{png::PNGEncoder, GenericImageView, PNG};
+use image::{png::PNGEncoder, GenericImageView};
 use masks::Masks;
-use std::io::{BufRead, Seek, Write};
+use std::io::Write;
 
 pub type Result<T, E = error::Error> = std::result::Result<T, E>;
 
-struct Length(u64);
+/// Store an arbitrary message within a PNG image.
+/// 
+/// The type of the source image probably doesn't matter, but the output image will be stored as
+/// PNG in order to avoid potential data loss due to compression.
+pub fn store(message: &[u8], carrier: &[u8], write: impl Write) -> Result<()> {
+    static MESSAGE_METADATA_LEN: usize = 160;
 
-impl From<usize> for Length {
-    fn from(u: usize) -> Self {
-        Length(u as u64)
+    let carrier_image = image::load_from_memory(carrier)?;
+    let (width, height) = carrier_image.dimensions();
+    let color_type = carrier_image.color();
+    let destination_image = PNGEncoder::new(write);
+
+    let mut carrier_stream = carrier_image.raw_pixels();
+
+    if carrier_stream.len() < MESSAGE_METADATA_LEN + message.len() * 4 {
+        return Err(Error::Length);
     }
+
+    write_masks(message.len(), &mut carrier_stream[0..32]);
+    write_masks(hash(message).as_ref(), &mut carrier_stream[32..160]);
+    write_masks(message, &mut carrier_stream[160..]);
+
+    Ok(destination_image.encode(&carrier_stream, width, height, color_type)?)
 }
 
-struct Byte(u8);
-
-pub struct Message<'a> {
-    content: &'a [u8],
-}
-
-impl<'a> Message<'a> {
-    pub fn new(content: &'a [u8]) -> Self {
-        Message { content }
-    }
-}
-
-impl Message<'_> {
-    pub fn store(&self, carrier: impl BufRead + Seek, write: impl Write) -> Result<()> {
-        let carrier_image = image::load(carrier, PNG)?;
-        let (width, height) = carrier_image.dimensions();
-        let color_type = carrier_image.color();
-        let destination_image = PNGEncoder::new(write);
-
-        let mut carrier_stream = carrier_image.raw_pixels();
-
-        if carrier_stream.len() < 160 + self.content.len() * 4 {
-            return Err(Error::Length);
-        }
-
-        self.write_len(&mut carrier_stream[0..32]);
-        self.write_hash(&mut carrier_stream[32..160]);
-        self.write_message(&mut carrier_stream[160..]);
-        Ok(destination_image.encode(&carrier_stream, width, height, color_type)?)
-    }
-
-    fn write_len(&self, s: &mut [u8]) {
-        let masks = Length::from(self.content.len()).masks();
-        for (u, mask) in s.iter_mut().zip(masks) {
-            *u >>= 2;
-            *u <<= 2;
-            *u |= mask;
-        }
-    }
-
-    fn write_hash(&self, s: &mut [u8]) {
-        let hash = hash(&self.content);
-        let masks = hash.iter().map(|&u| Byte(u).masks()).flatten();
-        for (u, mask) in s.iter_mut().zip(masks) {
-            *u >>= 2;
-            *u <<= 2;
-            *u |= mask;
-        }
-    }
-
-    fn write_message(&self, s: &mut [u8]) {
-        let masks = self
-            .content
-            .iter()
-            .cloned()
-            .map(Byte)
-            .flat_map(|byte| byte.masks());
-        for (u, mask) in s.iter_mut().zip(masks) {
-            *u >>= 2;
-            *u <<= 2;
-            *u |= mask;
-        }
-    }
-}
-
-pub fn recover(carrier: impl BufRead + Seek, mut write: impl Write) -> Result<()> {
-    let carrier_image = image::load(carrier, PNG)?;
+/// Recover a message stored using the library's store routine.
+pub fn recover(carrier: &[u8], mut write: impl Write) -> Result<()> {
+    let carrier_image = image::load_from_memory(carrier)?;
     let carrier_stream = carrier_image.raw_pixels();
+
     let len = read_len(&carrier_stream[0..32]) as usize;
+
     let expected_hash: Vec<_> = read_bytes(&carrier_stream[32..160]).collect();
     let bytes: Vec<_> = read_bytes(&carrier_stream[160..(160 + len * 4)]).collect();
 
-    let recovered_hash = hash(&bytes);
-    if expected_hash != recovered_hash {
+    if expected_hash != hash(&bytes) {
         return Err(Error::Checksum);
     }
 
     Ok(write.write_all(&bytes)?)
+}
+
+fn write_masks(content: impl Masks, carrier: &mut [u8]) {
+    for (u, mask) in carrier.iter_mut().zip(content.masks()) {
+        *u >>= 2;
+        *u <<= 2;
+        *u |= mask;
+    }
 }
 
 fn read_len(s: &[u8]) -> u64 {
